@@ -1,0 +1,107 @@
+name: リリースビルドと公開
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: テストの実行
+    runs-on: ubuntu-latest
+    steps:
+      - name: ソースコードのチェックアウト
+        uses: actions/checkout@v4
+
+      - name: .NET 10 SDKのセットアップ
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: ユニットテストの実行
+        run: dotnet test tests/ILFusion.Tests/ILFusion.Tests.csproj -c Release --logger "console;verbosity=normal"
+
+  build:
+    name: ビルド / ${{ matrix.rid }}
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            bin: ilfusion.exe
+            artifact: ilfusion-win-x64.exe
+          - os: windows-latest
+            rid: win-arm64
+            bin: ilfusion.exe
+            artifact: ilfusion-win-arm64.exe
+          - os: ubuntu-latest
+            rid: linux-x64
+            bin: ilfusion
+            artifact: ilfusion-linux-x64
+          - os: ubuntu-24.04-arm
+            rid: linux-arm64
+            bin: ilfusion
+            artifact: ilfusion-linux-arm64
+          - os: macos-13
+            rid: osx-x64
+            bin: ilfusion
+            artifact: ilfusion-osx-x64
+          - os: macos-latest
+            rid: osx-arm64
+            bin: ilfusion
+            artifact: ilfusion-osx-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: ソースコードのチェックアウト
+        uses: actions/checkout@v4
+
+      - name: .NET 10 SDKのセットアップ
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Linuxビルド依存パッケージのインストール
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang zlib1g-dev
+
+      - name: NativeAOTビルドと発行
+        run: dotnet publish src/ILFusion/ILFusion.csproj -c Release -r ${{ matrix.rid }} -o publish
+
+      - name: 実行ファイルのリネーム
+        shell: bash
+        run: mv "publish/${{ matrix.bin }}" "publish/${{ matrix.artifact }}"
+
+      - name: 成果物のアップロード
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: publish/${{ matrix.artifact }}
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    name: GitHubリリースの作成と公開
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: 全プラットフォームの成果物をダウンロード
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: GitHubリリースの作成と成果物のアップロード
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ILFusion ${{ github.ref_name }}
+          files: artifacts/*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
