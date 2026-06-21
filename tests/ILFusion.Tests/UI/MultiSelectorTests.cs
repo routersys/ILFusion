@@ -12,8 +12,8 @@ public sealed class MultiSelectorTests
             (modifiers & ConsoleModifiers.Alt) != 0,
             (modifiers & ConsoleModifiers.Control) != 0);
 
-    private static AssemblyEntry Assembly(string name, string? path = null) =>
-        new(path ?? $"/{name}", name, 1024);
+    private static AssemblyEntry Assembly(string name) =>
+        new($"/{name}", name, 1024);
 
     [Fact]
     public void Select_EmptyAssemblies_ReturnsEmpty()
@@ -117,53 +117,6 @@ public sealed class MultiSelectorTests
     }
 
     [Fact]
-    public void Select_PreselectedPrimary_IsFirstInResult()
-    {
-        var primary = Assembly("b.dll", "/b.dll");
-        var selector = new MultiSelector(new FakeConsoleIO(
-            Key(ConsoleKey.Spacebar),
-            Key(ConsoleKey.Enter)));
-        var assemblies = new[] { Assembly("a.dll"), Assembly("b.dll", "/b.dll") };
-
-        var result = selector.Select(assemblies, primary);
-
-        Assert.Equal(2, result.Count);
-        Assert.Equal("b.dll", result[0].Name);
-        Assert.Equal("a.dll", result[1].Name);
-    }
-
-    [Fact]
-    public void Select_PreselectedPrimary_IsPreSelected()
-    {
-        var primary = Assembly("b.dll", "/b.dll");
-        var selector = new MultiSelector(new FakeConsoleIO(Key(ConsoleKey.Enter)));
-        var assemblies = new[] { Assembly("a.dll"), Assembly("b.dll", "/b.dll") };
-
-        var result = selector.Select(assemblies, primary);
-
-        Assert.Single(result);
-        Assert.Equal("b.dll", result[0].Name);
-    }
-
-    [Fact]
-    public void Select_WithoutPreselected_FirstSelectedIsPrimary()
-    {
-        var selector = new MultiSelector(new FakeConsoleIO(
-            Key(ConsoleKey.DownArrow),
-            Key(ConsoleKey.Spacebar),
-            Key(ConsoleKey.DownArrow),
-            Key(ConsoleKey.Spacebar),
-            Key(ConsoleKey.Enter)));
-        var assemblies = new[] { Assembly("a.dll"), Assembly("b.dll"), Assembly("c.dll") };
-
-        var result = selector.Select(assemblies);
-
-        Assert.Equal(2, result.Count);
-        Assert.Equal("b.dll", result[0].Name);
-        Assert.Equal("c.dll", result[1].Name);
-    }
-
-    [Fact]
     public void Select_EnterWithNoSelection_DoesNotExit()
     {
         var selector = new MultiSelector(new FakeConsoleIO(
@@ -174,5 +127,25 @@ public sealed class MultiSelectorTests
         var result = selector.Select([Assembly("a.dll")]);
 
         Assert.Single(result);
+    }
+
+    [Fact]
+    public void Select_MultipleItems_ResultOrderedByIndex()
+    {
+        var selector = new MultiSelector(new FakeConsoleIO(
+            Key(ConsoleKey.DownArrow),
+            Key(ConsoleKey.Spacebar),
+            Key(ConsoleKey.DownArrow),
+            Key(ConsoleKey.Spacebar),
+            Key(ConsoleKey.UpArrow),
+            Key(ConsoleKey.UpArrow),
+            Key(ConsoleKey.Spacebar),
+            Key(ConsoleKey.Enter)));
+        var assemblies = new[] { Assembly("a.dll"), Assembly("b.dll"), Assembly("c.dll") };
+
+        var result = selector.Select(assemblies);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal(["a.dll", "b.dll", "c.dll"], result.Select(r => r.Name));
     }
 }

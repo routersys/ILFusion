@@ -2,14 +2,13 @@ namespace ILFusion.UI;
 
 using ILFusion.Models;
 
-sealed class MultiSelector(IConsoleIO console)
+sealed class SingleSelector(IConsoleIO console)
 {
-    public IReadOnlyList<AssemblyEntry> Select(IReadOnlyList<AssemblyEntry> assemblies)
+    public AssemblyEntry? Select(IReadOnlyList<AssemblyEntry> assemblies)
     {
         if (assemblies.Count == 0)
-            return [];
+            return null;
 
-        var selected = new HashSet<int>();
         var currentIndex = 0;
         console.CursorVisible = false;
 
@@ -17,7 +16,7 @@ sealed class MultiSelector(IConsoleIO console)
         {
             WriteHint();
             var startTop = console.GetCursorPosition().Top;
-            RenderList(assemblies, selected, currentIndex, startTop);
+            RenderList(assemblies, currentIndex, startTop);
 
             while (true)
             {
@@ -33,29 +32,16 @@ sealed class MultiSelector(IConsoleIO console)
                         currentIndex = (currentIndex + 1) % assemblies.Count;
                         break;
 
-                    case ConsoleKey.Spacebar:
-                        if (!selected.Remove(currentIndex))
-                            selected.Add(currentIndex);
-                        break;
-
-                    case ConsoleKey.A when key.Modifiers.HasFlag(ConsoleModifiers.Control):
-                        if (selected.Count == assemblies.Count)
-                            selected.Clear();
-                        else
-                            for (var i = 0; i < assemblies.Count; i++)
-                                selected.Add(i);
-                        break;
-
-                    case ConsoleKey.Enter when selected.Count >= 1:
+                    case ConsoleKey.Enter:
                         console.SetCursorPosition(0, startTop + assemblies.Count);
-                        return [.. selected.OrderBy(i => i).Select(i => assemblies[i])];
+                        return assemblies[currentIndex];
 
                     case ConsoleKey.Escape:
                         console.SetCursorPosition(0, startTop + assemblies.Count);
-                        return [];
+                        return null;
                 }
 
-                RenderList(assemblies, selected, currentIndex, startTop);
+                RenderList(assemblies, currentIndex, startTop);
             }
         }
         finally
@@ -67,14 +53,13 @@ sealed class MultiSelector(IConsoleIO console)
     private void WriteHint()
     {
         console.ForegroundColor = ConsoleColor.DarkGray;
-        console.WriteLine("[Space] 選択/解除  [↑↓] 移動  [Ctrl+A] 全選択/解除  [Enter] 確定  [Esc] キャンセル");
+        console.WriteLine("[↑↓] 移動  [Enter] 決定  [Esc] キャンセル");
         console.ResetColor();
         console.WriteLine();
     }
 
     private void RenderList(
         IReadOnlyList<AssemblyEntry> assemblies,
-        HashSet<int> selected,
         int currentIndex,
         int startTop)
     {
@@ -85,20 +70,13 @@ sealed class MultiSelector(IConsoleIO console)
             console.SetCursorPosition(0, startTop + i);
 
             var assembly = assemblies[i];
-            var isSelected = selected.Contains(i);
             var isCurrent = i == currentIndex;
 
-            console.ForegroundColor = (isCurrent, isSelected) switch
-            {
-                (true, _) => ConsoleColor.Cyan,
-                (_, true) => ConsoleColor.Green,
-                _ => ConsoleColor.DarkGray
-            };
+            console.ForegroundColor = isCurrent ? ConsoleColor.Cyan : ConsoleColor.DarkGray;
 
             var cursor = isCurrent ? "▶" : " ";
-            var check = isSelected ? "●" : "○";
             var sizeStr = $"({assembly.FormattedSize})";
-            var prefix = $" {cursor} [{check}] ";
+            var prefix = $" {cursor} ";
             var suffix = $"  {sizeStr}";
             var nameWidth = Math.Max(1, maxWidth - prefix.Length - suffix.Length);
             var name = assembly.Name.Length > nameWidth
