@@ -47,7 +47,7 @@ jobs:
             rid: linux-arm64
             bin: ilfusion
             artifact: ilfusion-linux-arm64
-          - os: macos-13
+          - os: macos-latest
             rid: osx-x64
             bin: ilfusion
             artifact: ilfusion-osx-x64
