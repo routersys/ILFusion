@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/ILFusion/ILFusion.csproj" />
+  <Project Path="tests/ILFusion.Tests/ILFusion.Tests.csproj" />
+</Solution>
