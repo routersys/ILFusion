@@ -7,7 +7,8 @@ using ILFusion.UI;
 sealed class Application(
     IAssemblyDiscoveryService discoveryService,
     IRepackRunner repackRunner,
-    MultiSelector selector,
+    SingleSelector singleSelector,
+    MultiSelector multiSelector,
     IConsoleIO console)
 {
     public async Task<int> RunAsync(string[] args, CancellationToken cancellationToken = default)
@@ -34,24 +35,52 @@ sealed class Application(
         WriteInfo($"ディレクトリ: {directory}  ({assemblies.Count} 件検出)");
         console.WriteLine();
 
-        var selected = selector.Select(assemblies, primaryAssembly);
+        if (primaryAssembly is null)
+        {
+            WriteSection("【主アセンブリの選択】");
+            console.WriteLine();
 
+            primaryAssembly = singleSelector.Select(assemblies);
+            console.WriteLine();
+
+            if (primaryAssembly is null)
+            {
+                WriteError("主アセンブリが選択されませんでした");
+                return ExitCodes.InsufficientSelection;
+            }
+        }
+        else
+        {
+            WriteInfo($"主アセンブリ: {primaryAssembly.Name}");
+            console.WriteLine();
+        }
+
+        var candidates = assemblies
+            .Where(a => !string.Equals(a.Path, primaryAssembly.Path, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (candidates.Count == 0)
+        {
+            WriteError("結合対象のアセンブリがありません");
+            return ExitCodes.NoAssembliesFound;
+        }
+
+        WriteSection("【結合するアセンブリの選択】");
         console.WriteLine();
 
-        if (selected.Count < 2)
+        var secondaries = multiSelector.Select(candidates);
+        console.WriteLine();
+
+        if (secondaries.Count == 0)
         {
-            WriteError("結合するには2つ以上のアセンブリを選択してください");
+            WriteError("結合するアセンブリを1つ以上選択してください");
             return ExitCodes.InsufficientSelection;
         }
 
-        var outputPath = PromptOutput(directory, selected[0]);
-        var options = PromptOptions();
+        var outputPath = PromptOutput(directory, primaryAssembly);
+        var options = PromptOptions(directory);
 
-        var config = new MergeConfiguration(
-            outputPath,
-            selected[0],
-            [.. selected.Skip(1)],
-            options);
+        var config = new MergeConfiguration(outputPath, primaryAssembly, [.. secondaries], options);
 
         console.WriteLine();
         WriteInfo("ILRepack を実行中...");
@@ -109,14 +138,43 @@ sealed class Application(
         return string.IsNullOrWhiteSpace(input) ? defaultOutput : input;
     }
 
-    private MergeOptions PromptOptions()
+    private MergeOptions PromptOptions(string sourceDirectory)
     {
         console.WriteLine();
         WriteInfo("オプション設定 (y/N):");
         var internalize = PromptYesNo("  内部化する (/internalize)");
         var suppressDebug = PromptYesNo("  デバッグ情報を除去する (/ndebug)");
         var union = PromptYesNo("  ユニオンマージ (/union)");
-        return new MergeOptions(internalize, suppressDebug, union);
+        var libPaths = PromptLibraryPaths(sourceDirectory);
+        return new MergeOptions(internalize, suppressDebug, union, libPaths);
+    }
+
+    private IReadOnlyList<string> PromptLibraryPaths(string sourceDirectory)
+    {
+        var paths = new List<string> { sourceDirectory };
+        console.WriteLine();
+        WriteInfo("追加のライブラリ検索パスを入力してください:");
+        console.ForegroundColor = ConsoleColor.DarkGray;
+        console.WriteLine("  依存アセンブリが別ディレクトリにある場合に指定します (空行で完了)");
+        console.ResetColor();
+
+        while (true)
+        {
+            console.Write("> ");
+            var input = console.ReadLine()?.Trim();
+            if (string.IsNullOrEmpty(input))
+                break;
+            if (Directory.Exists(input))
+                paths.Add(input);
+            else
+            {
+                console.ForegroundColor = ConsoleColor.Yellow;
+                console.WriteLine($"  警告: ディレクトリが存在しません: {input}");
+                console.ResetColor();
+            }
+        }
+
+        return paths;
     }
 
     private bool PromptYesNo(string question)
@@ -152,6 +210,13 @@ sealed class Application(
         directory = string.Empty;
         primaryAssembly = null;
         return false;
+    }
+
+    private void WriteSection(string title)
+    {
+        console.ForegroundColor = ConsoleColor.Yellow;
+        console.WriteLine(title);
+        console.ResetColor();
     }
 
     private void WriteInfo(string message)

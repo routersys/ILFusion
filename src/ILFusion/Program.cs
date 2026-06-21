@@ -6,8 +6,9 @@ var console = new ConsoleIO();
 var discoveryService = new AssemblyDiscoveryService();
 var processRunner = new ProcessRunner();
 var repackRunner = new RepackRunner(processRunner, FindILRepack());
-var selector = new MultiSelector(console);
-var app = new Application(discoveryService, repackRunner, selector, console);
+var singleSelector = new SingleSelector(console);
+var multiSelector = new MultiSelector(console);
+var app = new Application(discoveryService, repackRunner, singleSelector, multiSelector, console);
 return await app.RunAsync(args);
 
 static string FindILRepack()
