@@ -1,6 +1,10 @@
+using System.Text;
 using ILFusion;
 using ILFusion.Services;
 using ILFusion.UI;
+
+Console.OutputEncoding = Encoding.UTF8;
+Console.InputEncoding = Encoding.UTF8;
 
 var console = new ConsoleIO();
 var discoveryService = new AssemblyDiscoveryService();
