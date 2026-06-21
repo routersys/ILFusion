@@ -118,9 +118,16 @@ sealed class Application(
 
     private string PromptPath()
     {
-        WriteInfo("ディレクトリまたはアセンブリのパスを入力してください:");
-        console.Write("> ");
-        return console.ReadLine() ?? string.Empty;
+        while (true)
+        {
+            WriteInfo("ディレクトリまたはアセンブリのパスを入力してください:");
+            console.Write("> ");
+            var input = console.ReadLine()?.Trim();
+            if (!string.IsNullOrEmpty(input))
+                return input;
+            WriteError("パスを入力してください");
+            console.WriteLine();
+        }
     }
 
     private string PromptOutput(string directory, AssemblyEntry primary)
@@ -190,6 +197,13 @@ sealed class Application(
         out string directory,
         out AssemblyEntry? primaryAssembly)
     {
+        if (string.IsNullOrWhiteSpace(inputPath))
+        {
+            directory = string.Empty;
+            primaryAssembly = null;
+            return false;
+        }
+
         var fullPath = Path.GetFullPath(inputPath);
 
         if (File.Exists(fullPath))
