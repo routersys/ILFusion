@@ -113,6 +113,41 @@ public sealed class RepackRunnerTests
         Assert.DoesNotContain("/internalize", fake.LastArguments);
         Assert.DoesNotContain("/ndebug", fake.LastArguments);
         Assert.DoesNotContain("/union", fake.LastArguments);
+        Assert.DoesNotContain("/lib:", fake.LastArguments);
+    }
+
+    [Fact]
+    public async Task RunAsync_LibraryPaths_AppendsLibArguments()
+    {
+        var fake = new FakeProcessRunner();
+        var sut = new RepackRunner(fake);
+
+        await sut.RunAsync(BasicConfig(new MergeOptions(LibraryPaths: ["/lib/path1", "/lib/path2"])));
+
+        Assert.Contains("/lib:\"/lib/path1\"", fake.LastArguments);
+        Assert.Contains("/lib:\"/lib/path2\"", fake.LastArguments);
+    }
+
+    [Fact]
+    public async Task RunAsync_EmptyLibraryPaths_NoLibArguments()
+    {
+        var fake = new FakeProcessRunner();
+        var sut = new RepackRunner(fake);
+
+        await sut.RunAsync(BasicConfig(new MergeOptions(LibraryPaths: [])));
+
+        Assert.DoesNotContain("/lib:", fake.LastArguments);
+    }
+
+    [Fact]
+    public async Task RunAsync_LibPathWithSpaces_WrapsInQuotes()
+    {
+        var fake = new FakeProcessRunner();
+        var sut = new RepackRunner(fake);
+
+        await sut.RunAsync(BasicConfig(new MergeOptions(LibraryPaths: ["C:/my libs/path"])));
+
+        Assert.Contains("/lib:\"C:/my libs/path\"", fake.LastArguments);
     }
 
     [Fact]

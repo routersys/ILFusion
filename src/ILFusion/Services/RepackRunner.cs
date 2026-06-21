@@ -26,6 +26,10 @@ sealed class RepackRunner(IProcessRunner processRunner, string executablePath = 
         if (config.Options.UnionMerge)
             sb.Append(" /union");
 
+        if (config.Options.LibraryPaths is { Count: > 0 } libPaths)
+            foreach (var libPath in libPaths)
+                sb.Append($" /lib:{Quote(libPath)}");
+
         sb.Append($" {Quote(config.PrimaryAssembly.Path)}");
 
         foreach (var assembly in config.SecondaryAssemblies)
